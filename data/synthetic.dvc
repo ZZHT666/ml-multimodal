@@ -1,0 +1,6 @@
+outs:
+- md5: c3f21d6c14bdff832062e64c4b0f8e7a.dir
+  size: 227773
+  nfiles: 362
+  hash: md5
+  path: synthetic
