@@ -1,0 +1,5 @@
+outs:
+- md5: 812b3550920cd425d97df98eb8285a79
+  size: 180546111
+  hash: md5
+  path: fusion_model.pt

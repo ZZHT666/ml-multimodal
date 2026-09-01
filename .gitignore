@@ -5,4 +5,5 @@ __pycache__/
 data/synthetic/
 
 # model checkpoints and run outputs
-outputs/
+outputs/*
+!outputs/*.dvc
