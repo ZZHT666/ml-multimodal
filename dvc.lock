@@ -1,0 +1,100 @@
+schema: '2.0'
+stages:
+  train_flickr:
+    cmd: python -m src.train_features --features_dir features/flickr30k-v1 
+      --output_dir outputs/flickr30k --epochs 30 --batch_size 512 --lr 0.001 
+      --weight_decay 0.01 --embed_dim 256 --dropout 0.1
+    deps:
+    - path: features/flickr30k-v1
+      hash: md5
+      md5: d272eaf9f2157988b290d3e938629ffd.dir
+      size: 145844918
+      nfiles: 5
+    - path: src/metrics.py
+      hash: md5
+      md5: 5120b34494bfade60d615d30fc8a93b4
+      size: 3729
+    - path: src/model.py
+      hash: md5
+      md5: c59a43f760ba804ee2be55a9a7f98707
+      size: 7562
+    - path: src/train_features.py
+      hash: md5
+      md5: 9f81b991dc035a57ed75dcc831f340e7
+      size: 9525
+    params:
+      params.yaml:
+        train_flickr:
+          epochs: 30
+          batch_size: 512
+          lr: 0.001
+          weight_decay: 0.01
+          embed_dim: 256
+          dropout: 0.1
+    outs:
+    - path: outputs/flickr30k/heads.pt
+      hash: md5
+      md5: be715fd5fdabef7d188a3124094a89f6
+      size: 1323341
+    - path: outputs/flickr30k/metrics.json
+      hash: md5
+      md5: 137fc2e403054a25208bf65e935ef677
+      size: 641
+  assemble:
+    cmd: python -m src.assemble --heads outputs/flickr30k/heads.pt --out 
+      outputs/flickr30k/fusion_model.pt
+    deps:
+    - path: outputs/flickr30k/heads.pt
+      hash: md5
+      md5: be715fd5fdabef7d188a3124094a89f6
+      size: 1323341
+    - path: src/assemble.py
+      hash: md5
+      md5: b3679b2481b87337d28abcfebd9153b0
+      size: 2489
+    - path: src/model.py
+      hash: md5
+      md5: c59a43f760ba804ee2be55a9a7f98707
+      size: 7562
+    outs:
+    - path: outputs/flickr30k/fusion_model.pt
+      hash: md5
+      md5: a57a0b1debabc5592a6206df396067e5
+      size: 180543167
+  build_index:
+    cmd: python -m src.build_index --checkpoint 
+      outputs/flickr30k/fusion_model.pt --features_dir features/flickr30k-v1 
+      --snapshot data/flickr30k/pairs.parquet --out 
+      outputs/flickr30k/gallery_index.pt
+    deps:
+    - path: data/flickr30k
+      hash: md5
+      md5: 645bda0d3c64c55f0cea6621ba0852d1.dir
+      size: 9397059
+      nfiles: 2
+    - path: features/flickr30k-v1
+      hash: md5
+      md5: d272eaf9f2157988b290d3e938629ffd.dir
+      size: 145844918
+      nfiles: 5
+    - path: outputs/flickr30k/fusion_model.pt
+      hash: md5
+      md5: a57a0b1debabc5592a6206df396067e5
+      size: 180543167
+    - path: src/build_index.py
+      hash: md5
+      md5: 0f058c64b895220175dafeea947ced89
+      size: 4762
+    - path: src/serving/index.py
+      hash: md5
+      md5: 2b2909040860abb886d3fe4887a28e2a
+      size: 3611
+    - path: src/serving/service.py
+      hash: md5
+      md5: ba72e4774c9d64225969b86d5737a479
+      size: 5376
+    outs:
+    - path: outputs/flickr30k/gallery_index.pt
+      hash: md5
+      md5: 090593e5643977f765d6d63f02cdfb39
+      size: 38336378

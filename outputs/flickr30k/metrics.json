@@ -1,0 +1,17 @@
+{
+  "best_epoch": 24,
+  "test_i2t_recall_at_1": 0.5040000081062317,
+  "test_t2i_recall_at_1": 0.40799999237060547,
+  "test_i2t_recall_at_5": 0.8149999976158142,
+  "test_t2i_recall_at_5": 0.7297999858856201,
+  "test_i2t_recall_at_10": 0.8960000276565552,
+  "test_t2i_recall_at_10": 0.8234000205993652,
+  "test_rsum": 417.6200032234192,
+  "val_i2t_recall_at_1": 0.5374753475189209,
+  "val_t2i_recall_at_1": 0.41183432936668396,
+  "val_i2t_recall_at_5": 0.8205128312110901,
+  "val_t2i_recall_at_5": 0.7220907211303711,
+  "val_i2t_recall_at_10": 0.8934911489486694,
+  "val_t2i_recall_at_10": 0.8096646666526794,
+  "val_rsum": 419.5069044828415
+}
