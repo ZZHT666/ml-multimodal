@@ -1,9 +1,21 @@
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
 
-# generated synthetic data (regenerate via data/generate_synthetic.py)
+# generated synthetic data (versioned by DVC: data/synthetic.dvc)
 data/synthetic/
 
-# model checkpoints and run outputs
+# model checkpoints and run outputs (versioned by DVC: dvc.yaml / dvc.lock)
 outputs/*
 !outputs/*.dvc
+!outputs/.gitignore
+!outputs/metrics.json
+
+# MLflow local tracking store
+mlruns/
+mlflow.db
+mlartifacts/
+
+# latency benchmark reports
+benchmarks/

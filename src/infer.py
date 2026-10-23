@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoImageProcessor, AutoTokenizer
 
-from .config import Config
+from .config import config_from_checkpoint
 from .dataset import ImageTextDataset, make_collate_fn
 from .model import FusionCLIPModel
 
@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
 
     ckpt = torch.load(args.checkpoint, map_location="cpu")
-    cfg = Config(**ckpt["config"])
+    cfg = config_from_checkpoint(ckpt)
     device = torch.device(cfg.device)
 
     tokenizer = AutoTokenizer.from_pretrained(cfg.text_model_name)
@@ -59,7 +59,7 @@ def main():
         top_vals, top_idx = sims.topk(top_k)
 
     print(f"Query: {args.query!r}")
-    for rank, (score, idx) in enumerate(zip(top_vals.tolist(), top_idx.tolist()), start=1):
+    for rank, (score, idx) in enumerate(zip(top_vals.tolist(), top_idx.tolist(), strict=False), start=1):
         rec = records[idx]
         print(f"  #{rank}  score={score:.3f}  image={rec['image']}  caption={rec['text']!r}")
 

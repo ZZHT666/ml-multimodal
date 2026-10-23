@@ -3,22 +3,48 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoModel
+from transformers import AutoConfig, AutoModel
+
+
+def _build_backbone(model_name: str, pretrained: bool = True, config=None) -> nn.Module:
+    """Build a Hugging Face backbone.
+
+    pretrained=True  -> download/load the pretrained weights (training).
+    pretrained=False -> build the architecture from its config only; the
+                        weights are expected to come from our own checkpoint
+                        (serving), so the backbone weights are not loaded twice.
+    config           -> an explicit transformers config object (used by the
+                        unit tests to build tiny models fully offline).
+    """
+    if config is not None:
+        return AutoModel.from_config(config)
+    if pretrained:
+        return AutoModel.from_pretrained(model_name)
+    return AutoModel.from_config(AutoConfig.from_pretrained(model_name))
 
 
 class VisionEncoder(nn.Module):
     """Wraps any Hugging Face vision foundation model (ViT-style backbone
     that exposes `last_hidden_state`, e.g. DINOv2, ViT, BEiT)."""
 
-    def __init__(self, model_name: str, freeze: bool = True):
+    def __init__(self, model_name: str, freeze: bool = True,
+                 pretrained: bool = True, config=None):
         super().__init__()
-        self.backbone = AutoModel.from_pretrained(model_name)
+        self.backbone = _build_backbone(model_name, pretrained, config)
         self.hidden_size = self.backbone.config.hidden_size
         self.freeze = freeze
         if freeze:
             for p in self.backbone.parameters():
                 p.requires_grad = False
             self.backbone.eval()
+
+    def train(self, mode: bool = True):
+        # model.train() would otherwise flip a frozen backbone back into train
+        # mode and re-enable its dropout, adding noise to "frozen" features.
+        super().train(mode)
+        if self.freeze:
+            self.backbone.eval()
+        return self
 
     def forward(self, pixel_values: torch.Tensor, pooled: bool = True) -> torch.Tensor:
         with torch.no_grad() if self.freeze else torch.enable_grad():
@@ -30,15 +56,22 @@ class VisionEncoder(nn.Module):
 class TextEncoder(nn.Module):
     """Wraps any Hugging Face text encoder (BERT/DistilBERT/MiniLM-style)."""
 
-    def __init__(self, model_name: str, freeze: bool = True):
+    def __init__(self, model_name: str, freeze: bool = True,
+                 pretrained: bool = True, config=None):
         super().__init__()
-        self.backbone = AutoModel.from_pretrained(model_name)
+        self.backbone = _build_backbone(model_name, pretrained, config)
         self.hidden_size = self.backbone.config.hidden_size
         self.freeze = freeze
         if freeze:
             for p in self.backbone.parameters():
                 p.requires_grad = False
             self.backbone.eval()
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if self.freeze:
+            self.backbone.eval()
+        return self
 
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor,
                 pooled: bool = True) -> torch.Tensor:
@@ -79,10 +112,13 @@ class FusionCLIPModel(nn.Module):
 
     def __init__(self, vision_model_name: str, text_model_name: str,
                  embed_dim: int = 256, freeze_vision: bool = True,
-                 freeze_text: bool = True):
+                 freeze_text: bool = True, pretrained: bool = True,
+                 vision_config=None, text_config=None):
         super().__init__()
-        self.vision_encoder = VisionEncoder(vision_model_name, freeze=freeze_vision)
-        self.text_encoder = TextEncoder(text_model_name, freeze=freeze_text)
+        self.vision_encoder = VisionEncoder(vision_model_name, freeze=freeze_vision,
+                                            pretrained=pretrained, config=vision_config)
+        self.text_encoder = TextEncoder(text_model_name, freeze=freeze_text,
+                                        pretrained=pretrained, config=text_config)
         self.vision_proj = ProjectionHead(self.vision_encoder.hidden_size, embed_dim)
         self.text_proj = ProjectionHead(self.text_encoder.hidden_size, embed_dim)
         self.logit_scale = nn.Parameter(torch.tensor(math.log(1 / 0.07)))

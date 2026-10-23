@@ -1,5 +1,6 @@
+# training (torch: see https://pytorch.org for the right wheel for your machine)
 torch>=2.1
-transformers>=4.41
+transformers==4.46.3
 pillow>=10.0
 numpy>=1.24
 sentencepiece>=0.1.99

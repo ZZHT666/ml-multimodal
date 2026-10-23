@@ -44,9 +44,25 @@ src/
   config.py                # all hyperparameters / model names
   model.py                 # VisionEncoder, TextEncoder, FusionCLIPModel
   dataset.py                # JSONL manifest -> (pixel_values, text) dataset
-  train.py                  # contrastive training loop
-  infer.py                  # text -> image retrieval demo
-requirements.txt
+  train.py                  # contrastive training loop (+ MLflow tracking)
+  metrics.py                # Recall@K (duplicate-caption aware)
+  build_index.py            # offline: encode gallery images once -> gallery_index.pt
+  infer.py                  # text -> image retrieval demo (CLI)
+  serving/
+    app.py                  # FastAPI: /health /search /search/image /predict (Vertex) /metrics
+    service.py              # checkpoint loading, query encoding, per-stage timing
+    index.py                # in-memory cosine index + index/model version check
+    artifacts.py            # local path | gs:// | Vertex AIP_STORAGE_URI
+scripts/
+  benchmark_latency.py      # p50/p95/p99: in-process | local HTTP | Vertex endpoint
+  deploy_vertex.sh          # Cloud Build -> Artifact Registry -> Vertex AI endpoint
+tests/                      # pytest, fully offline (tiny random backbones)
+dvc.yaml / params.yaml      # train -> build_index pipeline
+Dockerfile                  # CPU serving image
+.github/workflows/ci.yml    # lint + tests on PRs, image build/push on main
+requirements.txt            # training
+requirements-serve.txt      # serving image
+requirements-dev.txt        # tests, lint, MLflow, DVC
 ```
 
 ## Sample dataset
@@ -97,3 +113,65 @@ python -m src.train --epochs 10 --batch_size 64 --lr 3e-4
   sequences, then attach a classification head on the pooled fusion output.
 - **Unfreezing backbones**: set `freeze_vision=False` / `freeze_text=False`
   in `Config` for full fine-tuning once the light-training baseline works.
+
+## Serving & MLOps
+
+```
+             offline (DVC pipeline)                         online (container)
+ data/synthetic ─► train ─► fusion_model.pt ─► build_index ─► gallery_index.pt
+   (dvc add)     │  (MLflow:     │                  (encode all          │
+                 │  params,      │                   gallery images      ▼
+                 │  metrics,     └───────────────────── once) ──► FastAPI /search
+                 │  artifacts)                                    encode 1 query
+                 ▼                                                + cosine top-k
+           outputs/metrics.json  (dvc metrics)
+```
+
+**Why it is fast:** gallery images are encoded offline once; a request only
+encodes one short text query (MiniLM-L6) and does one matrix-vector product
+against the pre-computed index.
+
+### Local
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+make repro            # dvc repro: train -> build_index (logs the run to MLflow)
+make serve            # http://localhost:8080/docs
+curl -s localhost:8080/search -H 'content-type: application/json' \
+     -d '{"query": "a red circle on a white background", "top_k": 3}'
+make bench            # model-only latency;  make bench-http for latency through HTTP
+make test             # unit tests (offline, ~seconds)
+make mlflow-ui        # http://localhost:5000
+```
+
+### Docker
+
+```bash
+make docker-build && make docker-run   # mounts ./outputs read-only into the container
+```
+
+### Vertex AI
+
+```bash
+export PROJECT_ID=<project>
+./scripts/deploy_vertex.sh all        # Cloud Build image, copy artifacts to GCS, register, deploy, test
+python scripts/benchmark_latency.py vertex --project $PROJECT_ID --region us-central1 --endpoint_id <id>
+./scripts/deploy_vertex.sh undeploy   # a deployed model bills per node-hour, even when idle
+```
+
+### Design notes
+
+- **Image ≠ model.** The container holds code + runtime + HF config/tokenizer
+  files only; weights come from the checkpoint (`FusionCLIPModel(pretrained=False)`),
+  passed in via `--artifact-uri` (Vertex sets `AIP_STORAGE_URI`). Retraining
+  does not require a new image.
+- **Index/model skew check.** The index stores the md5 of the checkpoint it
+  was built from (the same md5 DVC records); the server refuses to start if
+  the served checkpoint differs, instead of silently returning garbage.
+- **Latency is reported per stage** (`encode_ms`, `search_ms`, `inference_ms`)
+  in every response, plus `x-server-time-ms`; the benchmark compares that to
+  client-side latency to separate model time from HTTP/network overhead.
+- **Observability.** One JSON log line per request (Cloud Logging parses it),
+  Prometheus `/metrics` (request count, latency histogram), `x-request-id`.
+- **Warmup before ready.** The first inference pays one-off init costs; the
+  app runs a few warmup queries before `/health` reports healthy.

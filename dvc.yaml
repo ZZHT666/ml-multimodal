@@ -1,0 +1,35 @@
+# Reproducible pipeline:  data/synthetic (dvc add) -> train -> build_index
+#   dvc repro            # re-runs only stages whose deps/params changed
+#   dvc metrics show     # outputs/metrics.json
+#   dvc exp run -S train.lr=3e-4   # experiment with a different param
+#   dvc push             # upload outputs to the GCS remote
+stages:
+  train:
+    cmd: >-
+      python -m src.train
+      --epochs ${train.epochs} --batch_size ${train.batch_size}
+      --lr ${train.lr} --embed_dim ${train.embed_dim}
+    deps:
+      - data/synthetic
+      - src/train.py
+      - src/model.py
+      - src/dataset.py
+      - src/config.py
+      - src/metrics.py
+    params:
+      - train
+    outs:
+      - outputs/fusion_model.pt
+    metrics:
+      - outputs/metrics.json:
+          cache: false
+  build_index:
+    cmd: python -m src.build_index --checkpoint outputs/fusion_model.pt --out outputs/gallery_index.pt
+    deps:
+      - outputs/fusion_model.pt
+      - data/synthetic
+      - src/build_index.py
+      - src/serving/index.py
+      - src/serving/service.py
+    outs:
+      - outputs/gallery_index.pt

@@ -1,0 +1,15 @@
+.git
+.dvc/cache
+.dvc/tmp
+**/__pycache__
+*.pyc
+data/
+outputs/
+mlruns/
+mlflow.db
+benchmarks/
+tests/
+*.md
+.github/
+.venv/
+venv/
