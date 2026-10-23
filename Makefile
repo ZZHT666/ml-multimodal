@@ -1,5 +1,7 @@
 # Common commands. MLflow logs to a local SQLite store (needed for the Model Registry).
 export MLFLOW_TRACKING_URI ?= sqlite:///mlflow.db
+# On the VM: export MLFLOW_ARTIFACT_ROOT=gs://<bucket>/mlflow-artifacts (checkpoints go to GCS)
+export MLFLOW_ARTIFACT_ROOT
 PY ?= python
 
 FEATURES_URI ?= gs://zht-mle-demo-2026-a1b7/features/flickr30k/v1/dinov2-small__minilm-l6
@@ -7,7 +9,7 @@ MODEL_PATH ?= outputs/flickr30k/fusion_model.pt
 INDEX_PATH ?= outputs/flickr30k/gallery_index.pt
 export MODEL_PATH INDEX_PATH
 
-.PHONY: install features repro train-synthetic data serve test lint bench bench-http docker-build docker-run mlflow-ui
+.PHONY: install features repro mlflow-backup train-synthetic data serve test lint bench bench-http docker-build docker-run mlflow-ui
 
 install:            ## dev environment
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -47,5 +49,8 @@ docker-run:
 	  -e MODEL_PATH=/app/$(MODEL_PATH) -e INDEX_PATH=/app/$(INDEX_PATH) \
 	  -v $(PWD)/outputs:/app/outputs:ro clip-retrieval
 
-mlflow-ui:
-	mlflow ui --backend-store-uri $(MLFLOW_TRACKING_URI) --port 5000
+mlflow-ui:          ## on the VM: then `gcloud compute ssh ml-worker -- -L 5000:localhost:5000`
+	mlflow ui --backend-store-uri $(MLFLOW_TRACKING_URI) --host 127.0.0.1 --port 5000
+
+mlflow-backup:      ## copy the run-metadata DB next to the artifacts in GCS
+	gcloud storage cp mlflow.db $(MLFLOW_ARTIFACT_ROOT)/mlflow.db

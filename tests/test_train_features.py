@@ -127,3 +127,16 @@ def test_full_flow_and_cached_vs_raw_parity(tiny_backbones, tiny_dataset, tmp_pa
     cached = service.index.embeddings[0]
     assert service.index.records[0]["image_id"] == first["image_id"]
     assert F.cosine_similarity(raw, cached, dim=0) > 0.999
+
+
+def test_mlflow_artifacts_go_to_artifact_root(tmp_path, monkeypatch):
+    mlflow = pytest.importorskip("mlflow")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
+    monkeypatch.setenv("MLFLOW_ARTIFACT_ROOT", (tmp_path / "remote-artifacts").as_uri())  # gs:// on the VM
+    monkeypatch.chdir(tmp_path)
+    feats = _fake_store(tmp_path / "feat")
+    train_features.main(["--features_dir", str(feats), "--output_dir", str(tmp_path / "out"),
+                         "--epochs", "1", "--embed_dim", "16", "--experiment", "remote"])
+    exp = mlflow.get_experiment_by_name("remote")
+    assert exp.artifact_location.endswith("remote-artifacts/remote")
+    assert list((tmp_path / "remote-artifacts" / "remote").rglob("heads.pt"))

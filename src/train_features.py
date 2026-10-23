@@ -128,7 +128,9 @@ def main(argv=None):
         tracker = _NullTracker()
     else:
         import mlflow
-        mlflow.set_experiment(args.experiment)
+
+        from .tracking import set_experiment
+        set_experiment(args.experiment)
         mlflow.start_run()
         tracker = mlflow
 

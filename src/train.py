@@ -123,7 +123,9 @@ def main():
         tracker = _NullTracker()
     else:
         import mlflow  # tracking URI from MLFLOW_TRACKING_URI (Makefile: sqlite:///mlflow.db)
-        mlflow.set_experiment(args.experiment)
+
+        from .tracking import set_experiment
+        set_experiment(args.experiment)
         mlflow.start_run()
         tracker = mlflow
 

@@ -90,16 +90,26 @@ python -m src.features --snapshot data/flickr30k/pairs.parquet \
 checks every image against the snapshot). Without it, each image is read from its
 `gcs_uri`, which is what a fresh machine would do.
 
-## 6. Train, assemble, index -- on the laptop (light: ~150 MB of features, CPU)
+## 6. Train, assemble, index -- on the same VM
+
+Everything stays in the cloud: features come from GCS, MLflow artifacts go to GCS,
+DVC outputs go to the GCS remote; only code + small pointer files go to GitHub.
 
 ```bash
-make features     # mkdir -p features && dvc import-url gs://.../dinov2-small__minilm-l6 features/flickr30k-v1
-make repro        # dvc repro: train_flickr -> assemble -> build_index, then dvc metrics show
-git add features/flickr30k-v1.dvc dvc.lock outputs/flickr30k/metrics.json params.yaml
-git commit -m "model(flickr30k): heads trained on cached features"
-dvc push && git push
-make serve        # http://localhost:8080/docs  (MODEL_PATH/INDEX_PATH -> outputs/flickr30k/)
+cd ~/ml-multimodal && git pull && bash scripts/flickr30k/setup_vm.sh && source ~/venv/bin/activate
+export MLFLOW_ARTIFACT_ROOT=gs://zht-mle-demo-2026-a1b7/mlflow-artifacts
+rm -rf features/flickr30k-v1      # the local copy from step 5; re-import it *from GCS* with lineage
+make features                     # dvc import-url gs://.../dinov2-small__minilm-l6 features/flickr30k-v1
+make repro                        # dvc repro: train_flickr -> assemble -> build_index; dvc metrics show
+make mlflow-backup                # mlflow.db -> GCS
+dvc push                          # outputs (heads, fusion_model.pt, index) -> DVC remote in GCS
+git add features/flickr30k-v1.dvc dvc.lock outputs/flickr30k/metrics.json
+git commit -m "model(flickr30k): heads trained on cached features" && git push
 ```
+
+MLflow UI: `make mlflow-ui` on the VM, then from Cloud Shell
+`gcloud compute ssh ml-worker --zone=us-central1-a -- -L 8081:localhost:5000` and open
+Cloud Shell's *Web Preview* on port 8081.
 
 `dvc import-url` records *where* the features came from (the GCS URL) and their
 md5, so `dvc update features/flickr30k-v1.dvc` re-imports if they are regenerated.

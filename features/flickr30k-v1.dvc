@@ -1,0 +1,15 @@
+md5: 6debc5ecd0645d45d9e446c5eb78220e
+frozen: true
+deps:
+- md5: 02e8525c6b17c840ddc8dd8a14966bb7.dir
+  size: 145844918
+  nfiles: 5
+  hash: md5
+  path: 
+    gs://zht-mle-demo-2026-a1b7/features/flickr30k/v1/dinov2-small__minilm-l6
+outs:
+- md5: d272eaf9f2157988b290d3e938629ffd.dir
+  size: 145844918
+  nfiles: 5
+  hash: md5
+  path: flickr30k-v1
