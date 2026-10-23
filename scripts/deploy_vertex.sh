@@ -20,6 +20,8 @@ MODEL_DIR="gs://${BUCKET}/models/${IMAGE_NAME}/${VERSION}"
 MODEL_NAME="${MODEL_NAME:-clip-retrieval}"
 ENDPOINT_NAME="${ENDPOINT_NAME:-clip-retrieval-endpoint}"
 MACHINE_TYPE="${MACHINE_TYPE:-n1-standard-2}"
+CKPT_FILE="${CKPT_FILE:-outputs/flickr30k/fusion_model.pt}"
+INDEX_FILE="${INDEX_FILE:-outputs/flickr30k/gallery_index.pt}"
 
 gc() { gcloud --project="${PROJECT_ID}" "$@"; }
 
@@ -43,7 +45,9 @@ build() {
 artifacts() {
   # Model artifacts live next to (not inside) the image; Vertex copies this folder and
   # passes it to the container as AIP_STORAGE_URI.
-  gcloud storage cp outputs/fusion_model.pt outputs/gallery_index.pt "${MODEL_DIR}/"
+  # Uploaded under the fixed names the container expects (fusion_model.pt / gallery_index.pt).
+  gcloud storage cp "${CKPT_FILE}" "${MODEL_DIR}/fusion_model.pt"
+  gcloud storage cp "${INDEX_FILE}" "${MODEL_DIR}/gallery_index.pt"
   echo "artifacts: ${MODEL_DIR}"
 }
 
@@ -93,7 +97,7 @@ test_endpoint() {
     -H "Authorization: Bearer $(gcloud auth print-access-token)" \
     -H "Content-Type: application/json" \
     "https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/endpoints/${ep}:predict" \
-    -d '{"instances": [{"text": "a red circle on a white background"}], "parameters": {"top_k": 3}}'
+    -d '{"instances": [{"text": "a dog running on the beach"}], "parameters": {"top_k": 3}}'
   echo
   echo "benchmark: python scripts/benchmark_latency.py vertex --project ${PROJECT_ID} --region ${REGION} --endpoint_id ${ep}"
 }

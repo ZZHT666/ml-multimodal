@@ -90,7 +90,23 @@ python -m src.features --snapshot data/flickr30k/pairs.parquet \
 checks every image against the snapshot). Without it, each image is read from its
 `gcs_uri`, which is what a fresh machine would do.
 
-## 6. Stop paying for the VM when idle
+## 6. Train, assemble, index -- on the laptop (light: ~150 MB of features, CPU)
+
+```bash
+make features     # mkdir -p features && dvc import-url gs://.../dinov2-small__minilm-l6 features/flickr30k-v1
+make repro        # dvc repro: train_flickr -> assemble -> build_index, then dvc metrics show
+git add features/flickr30k-v1.dvc dvc.lock outputs/flickr30k/metrics.json params.yaml
+git commit -m "model(flickr30k): heads trained on cached features"
+dvc push && git push
+make serve        # http://localhost:8080/docs  (MODEL_PATH/INDEX_PATH -> outputs/flickr30k/)
+```
+
+`dvc import-url` records *where* the features came from (the GCS URL) and their
+md5, so `dvc update features/flickr30k-v1.dvc` re-imports if they are regenerated.
+The heads are selected by val rsum; test Recall@1/5/10 is computed once at the end
+(standard Flickr30k 1k-image test protocol).
+
+## 7. Stop paying for the VM when idle
 
 ```bash
 bash scripts/flickr30k/create_vm.sh stop     # or `delete` when completely done

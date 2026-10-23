@@ -1,35 +1,53 @@
-# Reproducible pipeline:  data/synthetic (dvc add) -> train -> build_index
-#   dvc repro            # re-runs only stages whose deps/params changed
-#   dvc metrics show     # outputs/metrics.json
-#   dvc exp run -S train.lr=3e-4   # experiment with a different param
-#   dvc push             # upload outputs to the GCS remote
+# Flickr30k pipeline (features are computed once on the VM by src/features.py and
+# imported with `dvc import-url`, see scripts/flickr30k/README.md):
+#
+#   features/flickr30k-v1 (import-url) ─► train_flickr ─► assemble ─► build_index
+#
+#   dvc repro                         # re-runs only stages whose deps/params changed
+#   dvc metrics show                  # outputs/flickr30k/metrics.json
+#   dvc exp run -S train_flickr.lr=3e-3 -S train_flickr.embed_dim=512
+#   dvc push                          # upload outputs to the GCS remote
+#
+# (The original synthetic-shapes demo still runs without DVC: `make train-synthetic`.)
 stages:
-  train:
+  train_flickr:
     cmd: >-
-      python -m src.train
-      --epochs ${train.epochs} --batch_size ${train.batch_size}
-      --lr ${train.lr} --embed_dim ${train.embed_dim}
+      python -m src.train_features --features_dir features/flickr30k-v1
+      --output_dir outputs/flickr30k
+      --epochs ${train_flickr.epochs} --batch_size ${train_flickr.batch_size}
+      --lr ${train_flickr.lr} --weight_decay ${train_flickr.weight_decay}
+      --embed_dim ${train_flickr.embed_dim} --dropout ${train_flickr.dropout}
     deps:
-      - data/synthetic
-      - src/train.py
+      - features/flickr30k-v1
+      - src/train_features.py
       - src/model.py
-      - src/dataset.py
-      - src/config.py
       - src/metrics.py
     params:
-      - train
+      - train_flickr
     outs:
-      - outputs/fusion_model.pt
+      - outputs/flickr30k/heads.pt
     metrics:
-      - outputs/metrics.json:
+      - outputs/flickr30k/metrics.json:
           cache: false
-  build_index:
-    cmd: python -m src.build_index --checkpoint outputs/fusion_model.pt --out outputs/gallery_index.pt
+  assemble:
+    cmd: python -m src.assemble --heads outputs/flickr30k/heads.pt --out outputs/flickr30k/fusion_model.pt
     deps:
-      - outputs/fusion_model.pt
-      - data/synthetic
+      - outputs/flickr30k/heads.pt
+      - src/assemble.py
+      - src/model.py
+    outs:
+      - outputs/flickr30k/fusion_model.pt
+  build_index:
+    cmd: >-
+      python -m src.build_index --checkpoint outputs/flickr30k/fusion_model.pt
+      --features_dir features/flickr30k-v1 --snapshot data/flickr30k/pairs.parquet
+      --out outputs/flickr30k/gallery_index.pt
+    deps:
+      - outputs/flickr30k/fusion_model.pt
+      - features/flickr30k-v1
+      - data/flickr30k
       - src/build_index.py
       - src/serving/index.py
       - src/serving/service.py
     outs:
-      - outputs/gallery_index.pt
+      - outputs/flickr30k/gallery_index.pt

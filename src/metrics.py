@@ -41,3 +41,35 @@ def retrieval_recall(image_embeds: torch.Tensor, text_embeds: torch.Tensor,
         results[f"i2t_recall_at_{k}"] = i2t
         results[f"t2i_recall_at_{k}"] = t2i
     return results
+
+
+@torch.no_grad()
+def grouped_recall(image_embeds: torch.Tensor, image_ids: Sequence, text_embeds: torch.Tensor,
+                   text_image_ids: Sequence, ks: Sequence[int] = (1, 5, 10)) -> Dict[str, float]:
+    """Standard Flickr30k / COCO retrieval protocol (each image has several captions).
+
+    image -> text: an image query is correct if ANY of its own captions is in the top-K texts.
+    text -> image: a caption query is correct if ITS image is in the top-K images.
+    "rsum" (sum of all six R@K in %) is the usual single number for model selection.
+    """
+    if len(image_embeds) != len(image_ids) or len(text_embeds) != len(text_image_ids):
+        raise ValueError("embeddings and ids must have the same length")
+    lookup: Dict = {}
+    img_gid = torch.tensor([lookup.setdefault(i, len(lookup)) for i in image_ids])
+    if len(lookup) != len(image_ids):
+        raise ValueError("image_ids must be unique")
+    try:
+        txt_gid = torch.tensor([lookup[i] for i in text_image_ids])
+    except KeyError as e:
+        raise ValueError(f"caption refers to an image not in the gallery: {e}") from None
+    img_gid, txt_gid = img_gid.to(image_embeds.device), txt_gid.to(image_embeds.device)
+
+    sims = image_embeds.float() @ text_embeds.float().t()      # (N_img, N_txt)
+    results: Dict[str, float] = {}
+    for k in ks:
+        top_txt = sims.topk(min(k, sims.size(1)), dim=1).indices
+        results[f"i2t_recall_at_{k}"] = (txt_gid[top_txt] == img_gid[:, None]).any(1).float().mean().item()
+        top_img = sims.t().topk(min(k, sims.size(0)), dim=1).indices
+        results[f"t2i_recall_at_{k}"] = (img_gid[top_img] == txt_gid[:, None]).any(1).float().mean().item()
+    results["rsum"] = 100 * sum(v for v in results.values())
+    return results

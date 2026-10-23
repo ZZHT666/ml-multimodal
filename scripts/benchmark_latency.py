@@ -28,10 +28,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 QUERIES = [
-    "a red circle on a white background", "a blue square on a black background",
-    "a green triangle on a gray background", "a yellow circle on a black background",
-    "a purple square on a white background", "an orange triangle on a white background",
-    "a small red shape", "something blue", "a triangle", "a circle on a dark background",
+    "a dog running on the beach", "two men playing basketball", "a child eating ice cream",
+    "a woman riding a bicycle in the city", "people sitting at a restaurant table",
+    "a man climbing a rock wall", "a group of people at a concert", "a red car on the street",
+    "a little girl in a pink dress", "a surfer riding a wave",
 ]
 
 
@@ -113,8 +113,8 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="mode", required=True)
     p_in = sub.add_parser("inprocess")
-    p_in.add_argument("--checkpoint", default="outputs/fusion_model.pt")
-    p_in.add_argument("--index", default="outputs/gallery_index.pt")
+    p_in.add_argument("--checkpoint", default="outputs/flickr30k/fusion_model.pt")
+    p_in.add_argument("--index", default="outputs/flickr30k/gallery_index.pt")
     p_in.add_argument("--device", default=None)
     p_in.add_argument("--threads", type=int, default=None, help="torch.set_num_threads")
     p_http = sub.add_parser("http")
