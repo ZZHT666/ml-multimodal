@@ -1,0 +1,6 @@
+outs:
+- md5: 645bda0d3c64c55f0cea6621ba0852d1.dir
+  size: 9397059
+  nfiles: 2
+  hash: md5
+  path: flickr30k
