@@ -19,3 +19,6 @@ mlartifacts/
 
 # latency benchmark reports
 benchmarks/
+
+# cached backbone features (stored in GCS / tracked by DVC)
+features/

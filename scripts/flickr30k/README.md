@@ -69,7 +69,28 @@ dvc push
 git push
 ```
 
-## 5. Stop paying for the VM when idle
+## 5. Feature extraction on the VM (~20–30 min on 8 vCPU)
+
+Both backbones are frozen, so their outputs are computed once and cached;
+training then only fits the projection heads on ~150 MB of vectors.
+
+```bash
+# on the VM, in a git clone of the repo (code comes from GitHub, not a zip)
+git clone https://github.com/<you>/ml-multimodal.git ~/ml-multimodal && cd ~/ml-multimodal
+bash scripts/flickr30k/setup_vm.sh && source ~/venv/bin/activate
+dvc pull data/flickr30k.dvc                    # the exact snapshot version from step 4
+tmux new -s features
+python -m src.features --snapshot data/flickr30k/pairs.parquet \
+    --image_root ~/flickr30k_work/extract/flickr30k-images --verify_md5 \
+    --out_dir features/flickr30k-v1 \
+    --upload gs://zht-mle-demo-2026-a1b7/features/flickr30k/v1/dinov2-small__minilm-l6
+```
+
+`--image_root` reads the local copy left by ingest (same bytes -- `--verify_md5`
+checks every image against the snapshot). Without it, each image is read from its
+`gcs_uri`, which is what a fresh machine would do.
+
+## 6. Stop paying for the VM when idle
 
 ```bash
 bash scripts/flickr30k/create_vm.sh stop     # or `delete` when completely done

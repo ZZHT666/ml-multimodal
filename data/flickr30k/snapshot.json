@@ -1,0 +1,14 @@
+{
+  "source": "mle-projects-506513.flickr30k.pairs",
+  "dataset_version": "v1",
+  "query": "SELECT * FROM `mle-projects-506513.flickr30k.pairs` WHERE dataset_version = @version ORDER BY image_id, caption_idx",
+  "bq_job_id": "36093966-e13f-485b-a294-d7b2a3b744df",
+  "exported_at": "2026-10-23T20:54:18Z",
+  "rows": 155070,
+  "images": 31014,
+  "rows_per_split": {
+    "train": 145000,
+    "val": 5070,
+    "test": 5000
+  }
+}
